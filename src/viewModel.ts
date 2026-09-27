@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { cropForRatio, makeVariant, moveCrop, resizeCrop } from './domain';
+import { cropForRatio, isUsableImage, makeVariant, moveCrop, resizeCrop } from './domain';
 import { EMPTY_DOCUMENT, type FrameDocument, type GuideKey, type Ratio, type ViewState } from './model';
 import type { FrameRepository } from './repository';
 import type { ImageService } from './service';
@@ -47,6 +47,10 @@ export class FrameSenseViewModel {
     this.patch({ phase: 'loading', notice: '正在载入图片…', error: null });
     try {
       const image = await this.imageService.readFile(file);
+      if (!isUsableImage(image)) {
+        this.patch({ phase: 'error', error: `「${image.name || file.name}」缺少有效的尺寸信息，工作台无法计算构图比例。请换一张图片重试。` });
+        return;
+      }
       const document: FrameDocument = { ...structuredClone(EMPTY_DOCUMENT), image };
       this.persist(document, '图片已载入，可以开始构图。');
     } catch (error) {

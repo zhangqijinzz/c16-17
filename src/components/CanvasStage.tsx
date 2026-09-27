@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import type { CropVariant, GuideKey, ImageAsset } from '../model';
 
 interface CanvasStageProps {
@@ -9,6 +9,21 @@ interface CanvasStageProps {
   onSubject: (x: number, y: number) => void;
   onMoveCrop: (dx: number, dy: number) => void;
   onResizeCrop: (width: number, height: number) => void;
+}
+
+// 长宽比超出 [1/4, 4] 时视为极端图：放宽高度限制，保证裁切框和缩放点始终可以操作。
+const EXTREME_WIDE_RATIO = 4;
+const EXTREME_TALL_RATIO = 0.25;
+const MIN_STAGE_HEIGHT = 240;
+const MAX_STAGE_HEIGHT = 720;
+
+function stageStyle(image: ImageAsset): CSSProperties {
+  const style: CSSProperties = { aspectRatio: `${image.width} / ${image.height}` };
+  const ratio = image.width / image.height;
+  if (!Number.isFinite(ratio) || ratio <= 0) return style;
+  if (ratio > EXTREME_WIDE_RATIO) style.minHeight = `${MIN_STAGE_HEIGHT}px`;
+  else if (ratio < EXTREME_TALL_RATIO) style.maxHeight = `${MAX_STAGE_HEIGHT}px`;
+  return style;
 }
 
 export function CanvasStage({ image, guides, crop, subject, onSubject, onMoveCrop, onResizeCrop }: CanvasStageProps) {
@@ -51,7 +66,7 @@ export function CanvasStage({ image, guides, crop, subject, onSubject, onMoveCro
 
   return (
     <div className="stage-shell">
-      <div className="canvas-stage" ref={stageRef} style={{ aspectRatio: `${image.width} / ${image.height}` }} onPointerDown={clickStage}>
+      <div className="canvas-stage" ref={stageRef} style={stageStyle(image)} onPointerDown={clickStage}>
         <img src={image.src} alt={image.name} draggable={false} />
         <div className="image-wash" />
         {guides.thirds && <div className="guide thirds-guide"><i /><i /><b /><b /></div>}

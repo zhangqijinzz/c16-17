@@ -19,8 +19,9 @@ class FakeImageService implements ImageService {
 
 describe('FrameSenseViewModel', () => {
   let repository: MemoryRepository;
+  let imageService: FakeImageService;
   let vm: FrameSenseViewModel;
-  beforeEach(() => { repository = new MemoryRepository(); vm = new FrameSenseViewModel(repository, new FakeImageService()); });
+  beforeEach(() => { repository = new MemoryRepository(); imageService = new FakeImageService(); vm = new FrameSenseViewModel(repository, imageService); });
 
   it('initializes empty and loads a demo image', async () => {
     await vm.initialize();
@@ -48,5 +49,27 @@ describe('FrameSenseViewModel', () => {
     expect(vm.getSnapshot().phase).toBe('error');
     expect(vm.getSnapshot().document.image).not.toBeNull();
     expect(vm.getSnapshot().error).toContain('本地保存失败');
+  });
+
+  it('rejects images without usable dimensions and keeps the current workbench', async () => {
+    vm.loadDemo();
+    const loaded = vm.getSnapshot().document;
+    imageService.asset = { src: 'data:image/svg+xml,bad', width: 0, height: 0, name: 'broken.svg' };
+    await vm.importImage(new File(['x'], 'broken.svg'));
+    const state = vm.getSnapshot();
+    expect(state.phase).toBe('error');
+    expect(state.error).toContain('换一张');
+    expect(state.document).toEqual(loaded);
+    expect(repository.document.image?.name).toBe('test.svg');
+  });
+
+  it('imports images with usable dimensions, including extreme panoramas', async () => {
+    const panorama: ImageAsset = { src: 'data:image/svg+xml,pano', width: 12000, height: 30, name: 'pano.svg' };
+    imageService.asset = panorama;
+    await vm.importImage(new File(['x'], 'pano.svg'));
+    const state = vm.getSnapshot();
+    expect(state.phase).toBe('editing');
+    expect(state.error).toBeNull();
+    expect(state.document.image).toEqual(panorama);
   });
 });
