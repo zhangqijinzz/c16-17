@@ -1,4 +1,5 @@
 import { useRef, useState, type PointerEvent } from 'react';
+import { displayRatio, hasUsableDimensions } from '../domain';
 import type { CropVariant, GuideKey, ImageAsset } from '../model';
 
 interface CanvasStageProps {
@@ -49,9 +50,12 @@ export function CanvasStage({ image, guides, crop, subject, onSubject, onMoveCro
     if (point) onSubject(point.x, point.y);
   };
 
+  // 极端长宽比会塌缩画布，这里把展示比例夹到安全区间，保证裁切框和缩放点始终可操作。
+  const stageRatio = displayRatio(image.width, image.height);
+
   return (
     <div className="stage-shell">
-      <div className="canvas-stage" ref={stageRef} style={{ aspectRatio: `${image.width} / ${image.height}` }} onPointerDown={clickStage}>
+      <div className="canvas-stage" ref={stageRef} style={{ aspectRatio: `${stageRatio}` }} onPointerDown={clickStage}>
         <img src={image.src} alt={image.name} draggable={false} />
         <div className="image-wash" />
         {guides.thirds && <div className="guide thirds-guide"><i /><i /><b /><b /></div>}
@@ -64,7 +68,7 @@ export function CanvasStage({ image, guides, crop, subject, onSubject, onMoveCro
           <button className="resize-handle" aria-label="调整裁切大小" onPointerDown={(event) => startDrag(event, 'resize')} onClick={(event) => event.stopPropagation()} />
         </div>
       </div>
-      <div className="stage-caption"><span>点击画面标记主体 · 拖动画框调整位置</span><span>{image.width} × {image.height}px</span></div>
+      <div className="stage-caption"><span>点击画面标记主体 · 拖动画框调整位置</span><span>{hasUsableDimensions(image) ? `${image.width} × ${image.height}px` : '尺寸信息不可用'}</span></div>
     </div>
   );
 }

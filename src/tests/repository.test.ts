@@ -26,4 +26,11 @@ describe('LocalFrameRepository', () => {
     expect(document.image).toBeNull();
     expect(document.variants).toEqual([]);
   });
+
+  it('drops stored images that have no usable dimensions', () => {
+    const storage = new MemoryStorage();
+    storage.value = JSON.stringify({ ...structuredClone(EMPTY_DOCUMENT), image: { src: 'data:,x', width: 0, height: 0, name: 'bad.svg' } });
+    const document = new LocalFrameRepository(storage).load();
+    expect(document.image).toBeNull();
+  });
 });

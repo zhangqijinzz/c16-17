@@ -19,8 +19,9 @@ class FakeImageService implements ImageService {
 
 describe('FrameSenseViewModel', () => {
   let repository: MemoryRepository;
+  let images: FakeImageService;
   let vm: FrameSenseViewModel;
-  beforeEach(() => { repository = new MemoryRepository(); vm = new FrameSenseViewModel(repository, new FakeImageService()); });
+  beforeEach(() => { repository = new MemoryRepository(); images = new FakeImageService(); vm = new FrameSenseViewModel(repository, images); });
 
   it('initializes empty and loads a demo image', async () => {
     await vm.initialize();
@@ -48,5 +49,38 @@ describe('FrameSenseViewModel', () => {
     expect(vm.getSnapshot().phase).toBe('error');
     expect(vm.getSnapshot().document.image).not.toBeNull();
     expect(vm.getSnapshot().error).toContain('本地保存失败');
+  });
+
+  it('rejects images without usable dimensions and keeps the current workbench', async () => {
+    vm.loadDemo();
+    images.asset = { src: 'data:image/svg+xml,broken', width: 0, height: 0, name: 'broken.svg' };
+    await vm.importImage(new File(['x'], 'broken.svg'));
+    const state = vm.getSnapshot();
+    expect(state.phase).toBe('error');
+    expect(state.error).toContain('尺寸信息');
+    expect(state.document.image?.name).toBe('test.svg');
+    expect(repository.document.image?.name).toBe('test.svg');
+  });
+
+  it('recovers when a valid image is imported after a broken one', async () => {
+    images.asset = { src: 'data:,broken', width: 0, height: 0, name: 'broken.svg' };
+    await vm.importImage(new File(['x'], 'broken.svg'));
+    expect(vm.getSnapshot().phase).toBe('error');
+    expect(vm.getSnapshot().document.image).toBeNull();
+    images.asset = { src: 'data:,ok', width: 800, height: 600, name: 'ok.png' };
+    await vm.importImage(new File(['x'], 'ok.png'));
+    expect(vm.getSnapshot().phase).toBe('editing');
+    expect(vm.getSnapshot().error).toBeNull();
+    expect(vm.getSnapshot().document.image?.name).toBe('ok.png');
+  });
+
+  it('applies ratio crops safely on extreme panorama images', () => {
+    images.asset = { src: 'data:,pano', width: 10000, height: 50, name: 'pano.jpg' };
+    vm.loadDemo();
+    vm.setRatio('1:1');
+    const crop = vm.getSnapshot().document.crop;
+    expect(Number.isFinite(crop.width)).toBe(true);
+    expect(crop.width).toBeGreaterThanOrEqual(0.12);
+    expect(crop.x + crop.width).toBeLessThanOrEqual(1);
   });
 });

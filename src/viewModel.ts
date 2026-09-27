@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { cropForRatio, makeVariant, moveCrop, resizeCrop } from './domain';
+import { cropForRatio, hasUsableDimensions, imageRatioOf, makeVariant, moveCrop, resizeCrop } from './domain';
 import { EMPTY_DOCUMENT, type FrameDocument, type GuideKey, type Ratio, type ViewState } from './model';
 import type { FrameRepository } from './repository';
 import type { ImageService } from './service';
@@ -47,6 +47,11 @@ export class FrameSenseViewModel {
     this.patch({ phase: 'loading', notice: '正在载入图片…', error: null });
     try {
       const image = await this.imageService.readFile(file);
+      if (!hasUsableDimensions(image)) {
+        // 尺寸信息缺失的图片不进工作台：保留当前状态，提示后允许直接换一张。
+        this.patch({ phase: 'error', error: '这张图片缺少有效的尺寸信息，无法用于构图，请换一张图片重试。' });
+        return;
+      }
       const document: FrameDocument = { ...structuredClone(EMPTY_DOCUMENT), image };
       this.persist(document, '图片已载入，可以开始构图。');
     } catch (error) {
@@ -66,7 +71,7 @@ export class FrameSenseViewModel {
   setRatio(ratio: Ratio): void {
     const image = this.state.document.image;
     if (!image) return;
-    const crop = cropForRatio(ratio, image.width / image.height, this.state.document.crop);
+    const crop = cropForRatio(ratio, imageRatioOf(image.width, image.height), this.state.document.crop);
     this.persist({ ...this.state.document, crop }, `${ratio === 'free' ? '自由' : ratio} 裁切已应用。`);
   }
 
